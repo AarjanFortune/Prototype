@@ -1,0 +1,10 @@
+# Additional backend directories
+
+# Create uploads directory for temporary uploads
+uploads/
+
+# Create models directory for trained models
+models/
+
+# Create temp directory for processing
+temp/
