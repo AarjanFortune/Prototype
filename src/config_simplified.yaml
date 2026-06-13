@@ -1,0 +1,33 @@
+# Tab Estimation Configuration (Simplified - TAB MODE ONLY)
+
+# Audio Processing
+down_sampling_rate: 22050
+bins_per_octave: 24
+cqt_n_bins: 192
+hop_length: 512
+
+# Data
+note_resolution: 16
+train_ratio: 0.8
+n_cores: 4
+
+# Model Architecture
+input_feature_type: "cqt"    # "cqt" or "melspec"
+encoder_type: "conformer"    # Use Conformer encoder
+use_conv_stack: True         # Use Conv2D -> BatchNorm -> MaxPool
+d_model: 512                 # Model dimension
+encoder_heads: 4             # Number of attention heads
+encoder_layers: 4            # Number of encoder layers
+
+# Training
+epoch: 100
+batch_size: 16
+lr: 0.001
+weight_decay: 0.0001
+gradient_clip_norm: 1.0
+use_guided_attention_loss: True
+
+# Output (TAB ONLY)
+# 6 strings x 21 frets (0-20 are frets, 21st is "no note")
+n_strings: 6
+n_frets: 21
