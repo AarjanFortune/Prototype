@@ -62,7 +62,7 @@ def preprocess_guitarset(jams_dir, audio_dir, output_dir, config_path, n_cores=4
     print(f"Found {len(jams_files)} JAMS files")
     
     if len(jams_files) == 0:
-        print(f"❌ No JAMS files found in {jams_dir}")
+        print(f"ERROR: No JAMS files found in {jams_dir}")
         return
     
     # Match with audio files
@@ -73,13 +73,13 @@ def preprocess_guitarset(jams_dir, audio_dir, output_dir, config_path, n_cores=4
     skipped = 0
     
     for jam_path in jams_files:
-        # Construct audio path
-        # GuitarSet convention: annotation file name -> audio file name
-        jam_basename = os.path.basename(jam_path).replace('_comp.jams', '_mic.wav').replace('_solo.jams', '_mic.wav')
+        # GuitarSet convention mapping:
+        # 00_BN1-129-Eb_comp.jams -> 00_BN1-129-Eb_comp_mic.wav
+        jam_basename = os.path.basename(jam_path).replace('.jams', '_mic.wav')
         audio_path = os.path.join(audio_dir, jam_basename)
         
         if not os.path.exists(audio_path):
-            print(f"⚠ Audio not found for {jam_path}: {audio_path}")
+            print(f"Audio not found for {jam_path}: {audio_path}")
             skipped += 1
             continue
         
@@ -89,7 +89,7 @@ def preprocess_guitarset(jams_dir, audio_dir, output_dir, config_path, n_cores=4
     print(f"Will process {successful} files ({skipped} skipped)\n")
     
     if len(process_args) == 0:
-        print("❌ No matching JAMS-audio pairs found")
+        print("ERROR: No matching JAMS-audio pairs found")
         return
     
     # Process files
@@ -146,15 +146,15 @@ def main():
     
     # Check directories
     if not os.path.exists(args.jams_dir):
-        print(f"❌ ERROR: JAMS directory not found: {args.jams_dir}")
+        print(f"ERROR: JAMS directory not found: {args.jams_dir}")
         return
     
     if not os.path.exists(args.audio_dir):
-        print(f"❌ ERROR: Audio directory not found: {args.audio_dir}")
+        print(f"ERROR: Audio directory not found: {args.audio_dir}")
         return
     
     if not os.path.exists(args.config):
-        print(f"❌ ERROR: Config file not found: {args.config}")
+        print(f"ERROR: Config file not found: {args.config}")
         return
     
     # Run preprocessing

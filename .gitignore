@@ -1,0 +1,9 @@
+data/
+models/
+runs/
+venv/
+__pycache__/
+.DS_Store
+
+frontend/node_modules/
+data/Guitarset/annotation/

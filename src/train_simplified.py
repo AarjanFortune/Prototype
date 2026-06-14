@@ -1,6 +1,6 @@
 """
 Simplified training script for TAB estimation
-- Clean training loop
+- Clean training loop with high-performance GPU AMP optimization
 - Validation
 - Model checkpointing
 """
@@ -11,6 +11,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 import os
+import gc
 import argparse
 from tqdm import tqdm
 import numpy as np
@@ -38,6 +39,8 @@ class TabTrainer:
         self.device = device
         
         print(f"Using device: {self.device}")
+        if 'cuda' in str(self.device):
+            print(f"GPU Name: {torch.cuda.get_device_name(0)}")
         
         # Model
         self.model = SimpleTabEstimator(config).to(device)
@@ -66,82 +69,34 @@ class TabTrainer:
         self.start_epoch = 0
     
     def train_epoch(self, train_loader):
-        """Train for one epoch."""
+        """Train for one epoch using automatic mixed precision (AMP)."""
         self.model.train()
         total_loss = 0
         n_batches = 0
         
+        # Initialize GradScaler for FP16 training on RTX 4050
+        scaler = torch.cuda.amp.GradScaler(enabled=('cuda' in str(self.device)))
+        
         pbar = tqdm(train_loader, desc='Training')
         for batch_idx, batch in enumerate(pbar):
-            # Unpack batch (now includes onset)
             cqt, frame_tab, frame_onset, tab, onset, frame_lengths, note_lengths, tempos = batch
             
-            cqt = cqt.to(self.device)
-            frame_tab = frame_tab.to(self.device)
-            frame_onset = frame_onset.to(self.device)
-            tab = tab.to(self.device)
-            onset = onset.to(self.device)
-            frame_lengths = frame_lengths.to(self.device)
-            note_lengths = note_lengths.to(self.device)
+            # Non-blocking transfers pull data to GPU VRAM asynchronously
+            cqt = cqt.to(self.device, non_blocking=True)
+            frame_tab = frame_tab.to(self.device, non_blocking=True)
+            frame_onset = frame_onset.to(self.device, non_blocking=True)
+            tab = tab.to(self.device, non_blocking=True)
+            onset = onset.to(self.device, non_blocking=True)
+            frame_lengths = frame_lengths.to(self.device, non_blocking=True)
+            note_lengths = note_lengths.to(self.device, non_blocking=True)
             
-            # Forward pass
-            self.optimizer.zero_grad()
+            # set_to_none=True safely saves modest amounts of memory over zero_grad()
+            self.optimizer.zero_grad(set_to_none=True)
             
-            frame_pred, onset_pred, note_pred, attn_weights = self.model(cqt, frame_lengths, bpm=tempos)
-            
-            # Loss - three branches (frame, onset, note)
-            loss = self.criterion(
-                frame_pred, frame_tab,
-                onset_pred, frame_onset,
-                note_pred, tab,
-                attn_weights=attn_weights,
-                input_lengths=frame_lengths,
-                output_lengths=frame_lengths
-            )
-            
-            # Backward pass
-            loss.backward()
-            
-            # Gradient clipping norm <= 1.0
-            torch.nn.utils.clip_grad_norm_(
-                self.model.parameters(),
-                self.gradient_clip_norm
-            )
-            
-            self.optimizer.step()
-            
-            total_loss += loss.item()
-            n_batches += 1
-            
-            pbar.set_postfix({'loss': loss.item()})
-        
-        avg_loss = total_loss / max(n_batches, 1)
-        return avg_loss
-    
-    def validate(self, val_loader):
-        """Validate the model."""
-        self.model.eval()
-        total_loss = 0
-        n_batches = 0
-        
-        pbar = tqdm(val_loader, desc='Validation')
-        with torch.no_grad():
-            for batch in pbar:
-                # Unpack batch (now includes onset)
-                cqt, frame_tab, frame_onset, tab, onset, frame_lengths, note_lengths, tempos = batch
-                
-                cqt = cqt.to(self.device)
-                frame_tab = frame_tab.to(self.device)
-                frame_onset = frame_onset.to(self.device)
-                tab = tab.to(self.device)
-                onset = onset.to(self.device)
-                frame_lengths = frame_lengths.to(self.device)
-                note_lengths = note_lengths.to(self.device)
-                
-                # Forward pass
+            # Forward pass with AMP autocast
+            with torch.cuda.amp.autocast(enabled=('cuda' in str(self.device))):
                 frame_pred, onset_pred, note_pred, attn_weights = self.model(cqt, frame_lengths, bpm=tempos)
                 
-                # Loss
                 loss = self.criterion(
                     frame_pred, frame_tab,
                     onset_pred, frame_onset,
@@ -150,14 +105,68 @@ class TabTrainer:
                     input_lengths=frame_lengths,
                     output_lengths=frame_lengths
                 )
+            
+            # Backpropagation using loss scaling
+            scaler.scale(loss).backward()
+            
+            # Unscale weights for safe gradient clipping
+            scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip_norm)
+            
+            # Step optimizer and update scale factors
+            scaler.step(self.optimizer)
+            scaler.update()
+            
+            total_loss += loss.item()
+            n_batches += 1
+            
+            pbar.set_postfix({'loss': f"{loss.item():.4f}"})
+        
+        # Force memory collection after epoch to prevent Windows RAM OOM crashes
+        gc.collect()
+        if 'cuda' in str(self.device):
+            torch.cuda.empty_cache()
+            
+        return total_loss / max(n_batches, 1)
+    
+    def validate(self, val_loader):
+        """Validate the model with mixed precision safety."""
+        self.model.eval()
+        total_loss = 0
+        n_batches = 0
+        
+        pbar = tqdm(val_loader, desc='Validation')
+        with torch.no_grad():
+            for batch in pbar:
+                cqt, frame_tab, frame_onset, tab, onset, frame_lengths, note_lengths, tempos = batch
+                
+                cqt = cqt.to(self.device, non_blocking=True)
+                frame_tab = frame_tab.to(self.device, non_blocking=True)
+                frame_onset = frame_onset.to(self.device, non_blocking=True)
+                tab = tab.to(self.device, non_blocking=True)
+                onset = onset.to(self.device, non_blocking=True)
+                frame_lengths = frame_lengths.to(self.device, non_blocking=True)
+                note_lengths = note_lengths.to(self.device, non_blocking=True)
+                
+                with torch.cuda.amp.autocast(enabled=('cuda' in str(self.device))):
+                    frame_pred, onset_pred, note_pred, attn_weights = self.model(cqt, frame_lengths, bpm=tempos)
+                    
+                    loss = self.criterion(
+                        frame_pred, frame_tab,
+                        onset_pred, frame_onset,
+                        note_pred, tab,
+                        attn_weights=attn_weights,
+                        input_lengths=frame_lengths,
+                        output_lengths=frame_lengths
+                    )
                 
                 total_loss += loss.item()
                 n_batches += 1
                 
-                pbar.set_postfix({'loss': loss.item()})
+                pbar.set_postfix({'loss': f"{loss.item():.4f}"})
         
-        avg_loss = total_loss / max(n_batches, 1)
-        return avg_loss
+        gc.collect()
+        return total_loss / max(n_batches, 1)
     
     def train(self, train_loader, val_loader, num_epochs, model_dir='./models', tb_dir='./runs'):
         """Train the model."""
@@ -236,9 +245,9 @@ def main():
                       help='Directory to save models')
     parser.add_argument('--tb_dir', type=str, default='./runs',
                       help='Directory for TensorBoard logs')
-    parser.add_argument('--num_epochs', type=int, default=100,
-                      help='Number of epochs')
-    parser.add_argument('--batch_size', type=int, default=16,
+    parser.add_argument('--num_epochs', type=int, default=None,
+                      help='Number of epochs (overrides config)')
+    parser.add_argument('--batch_size', type=int, default=None,
                       help='Batch size')
     parser.add_argument('--lr', type=float, default=None,
                       help='Learning rate (overrides config)')
@@ -256,9 +265,11 @@ def main():
         config['lr'] = args.lr
     if args.batch_size is not None:
         config['batch_size'] = args.batch_size
+        
+    num_epochs = args.num_epochs if args.num_epochs is not None else config.get('epoch', 100)
     
     print("\n" + "="*60)
-    print("TAB ESTIMATOR - TRAINING")
+    print("TAB ESTIMATOR - TRAINING (HIGH PERFORMANCE GPU MODE)")
     print("="*60)
     print("\nConfiguration:")
     for key, value in config.items():
@@ -289,13 +300,13 @@ def main():
         args.data_dir,
         batch_size=config['batch_size'],
         train_ratio=config.get('train_ratio', 0.8),
-        num_workers=config.get('n_cores', 4)
+        num_workers=config.get('n_cores', 0)  # Safe multithreading setup
     )
     
     # Train
     trainer.train(
         train_loader, val_loader,
-        num_epochs=args.num_epochs,
+        num_epochs=num_epochs,
         model_dir=args.model_dir,
         tb_dir=args.tb_dir
     )

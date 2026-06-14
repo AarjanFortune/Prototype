@@ -23,18 +23,7 @@ class TabDataPreprocessor:
     
     @staticmethod
     def jams_to_tab_with_onset(jam_file, tempo=120, note_resolution=16):
-        """
-        Convert JAMS file to TAB + Onset representation.
-        
-        Args:
-            jam_file: path to JAMS file
-            tempo: BPM tempo
-            note_resolution: notes per beat (default 16 = 16th notes)
-        
-        Returns:
-            tab: (n_notes, 6, 21) - TAB representation
-            onset: (n_notes, 6, 21) - Onset markers (1 when note starts)
-        """
+        """Convert JAMS file to TAB + Onset representation."""
         jam = jams.load(jam_file)
         
         # Get note annotations
@@ -95,19 +84,7 @@ class TabDataPreprocessor:
     
     @staticmethod
     def extract_cqt(audio_path, sr=22050, n_bins=192, bins_per_octave=24, hop_length=512):
-        """
-        Extract CQT features from audio.
-        
-        Args:
-            audio_path: path to audio file
-            sr: sampling rate
-            n_bins: number of CQT bins
-            bins_per_octave: bins per octave
-            hop_length: hop length
-        
-        Returns:
-            cqt: (T, n_bins) CQT spectrogram
-        """
+        """Extract CQT features from audio."""
         # Load audio
         y, sr_orig = librosa.load(audio_path, sr=sr, mono=True)
         
@@ -129,19 +106,7 @@ class TabDataPreprocessor:
     def process_audio_jams_pair(audio_path, jams_path, output_npz_path, 
                                sr=22050, n_bins=192, bins_per_octave=24, 
                                hop_length=512, note_resolution=16):
-        """
-        Process audio-JAMS pair and save as NPZ with onset data.
-        
-        Args:
-            audio_path: path to audio file
-            jams_path: path to JAMS annotation file
-            output_npz_path: where to save NPZ file
-            sr: sampling rate
-            n_bins: CQT bins
-            bins_per_octave: CQT bins per octave
-            hop_length: hop length in samples
-            note_resolution: note resolution (16th notes)
-        """
+        """Process audio-JAMS pair and save as NPZ with onset data."""
         # Extract CQT
         cqt = TabDataPreprocessor.extract_cqt(
             audio_path, sr=sr, n_bins=n_bins, 
@@ -193,11 +158,6 @@ class TabDataset(Dataset):
     """PyTorch Dataset for TAB estimation with Frame + Onset + Note branches."""
     
     def __init__(self, npz_file_list, use_cqt=True):
-        """
-        Args:
-            npz_file_list: list of paths to NPZ files
-            use_cqt: if True use CQT features, else use others
-        """
         self.npz_file_list = npz_file_list
         self.use_cqt = use_cqt
     
@@ -205,15 +165,6 @@ class TabDataset(Dataset):
         return len(self.npz_file_list)
     
     def __getitem__(self, idx):
-        """
-        Returns:
-            cqt: (T, 192) input features
-            frame_tab: (T, 6, 21) frame-level ground truth
-            frame_onset: (T, 6, 21) frame-level onset ground truth
-            tab: (T_note, 6, 21) note-level ground truth
-            onset: (T_note, 6, 21) note-level onset ground truth
-            tempo: scalar
-        """
         npz_file = np.load(self.npz_file_list[idx])
         
         cqt = npz_file['cqt'].astype(np.float32)
@@ -227,22 +178,7 @@ class TabDataset(Dataset):
 
 
 def pad_collate_tab(batch):
-    """
-    Custom collate function for padding variable length sequences.
-    
-    Args:
-        batch: list of (cqt, frame_tab, frame_onset, tab, onset, tempo)
-    
-    Returns:
-        cqt_padded: (B, T_max, 192)
-        frame_tab_padded: (B, T_max, 6, 21)
-        frame_onset_padded: (B, T_max, 6, 21)
-        tab_padded: (B, T_note_max, 6, 21)
-        onset_padded: (B, T_note_max, 6, 21)
-        frame_lengths: (B,)
-        note_lengths: (B,)
-        tempos: (B,)
-    """
+    """Custom collate function for padding variable length sequences."""
     cqts, frame_tabs, frame_onsets, tabs, onsets, tempos = zip(*batch)
     
     batch_size = len(batch)
@@ -282,42 +218,32 @@ def pad_collate_tab(batch):
 
 
 def get_data_loaders(npz_dir, batch_size=16, train_ratio=0.8, num_workers=0):
-    """
-    Create train and validation data loaders.
-    
-    Args:
-        npz_dir: directory containing NPZ files
-        batch_size: batch size
-        train_ratio: train/val split ratio
-        num_workers: number of workers for data loading
-    
-    Returns:
-        train_loader, val_loader
-    """
-    # Get all NPZ files
+    """Create train and validation data loaders with page-locked pin_memory."""
     npz_files = sorted(glob.glob(os.path.join(npz_dir, '*.npz')))
     
     if len(npz_files) == 0:
         raise ValueError(f"No NPZ files found in {npz_dir}")
     
-    # Split into train/val
     n_train = int(len(npz_files) * train_ratio)
     train_files = npz_files[:n_train]
     val_files = npz_files[n_train:]
     
-    # Create datasets
     train_dataset = TabDataset(train_files)
     val_dataset = TabDataset(val_files)
     
-    # Create data loaders
+    # Check if GPU is present to configure fast asynchronous streaming
+    use_pin = torch.cuda.is_available()
+    
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True,
-        num_workers=num_workers, collate_fn=pad_collate_tab
+        num_workers=num_workers, collate_fn=pad_collate_tab,
+        pin_memory=use_pin
     )
     
     val_loader = DataLoader(
         val_dataset, batch_size=batch_size, shuffle=False,
-        num_workers=num_workers, collate_fn=pad_collate_tab
+        num_workers=num_workers, collate_fn=pad_collate_tab,
+        pin_memory=use_pin
     )
     
     print(f"Train samples: {len(train_files)}, Val samples: {len(val_files)}")
