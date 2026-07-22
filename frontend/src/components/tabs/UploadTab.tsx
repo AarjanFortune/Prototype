@@ -1,33 +1,13 @@
 import axios from 'axios'
 import { useState } from 'react'
-import './UploadTab.css'
 import { CombinedViewer } from '../CombinedViewer'
 import LoadingSpinner from '../LoadingSpinner'
-
-interface PianorollNote {
-  midi: number
-  string: number
-  fret: number
-  start_time: number
-  duration: number
-}
 
 interface TranscriptionResult {
   status: string
   tab: string[]
   confidence: number[][]
-  pianoroll?: {
-    notes: PianorollNote[]
-    total_duration: number
-  }
-  metadata: {
-    duration: number
-    sample_rate: number
-    n_frames: number
-    tempo: number
-    feature_type: string
-  }
-  error?: string
+  metadata: { duration: number; tempo: number; n_frames: number; feature_type: string }
 }
 
 export default function UploadTab() {
@@ -35,145 +15,101 @@ export default function UploadTab() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<TranscriptionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [featureType, setFeatureType] = useState('cqt')
+  const [processingMethod, setProcessingMethod] = useState('cqt')
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      const validTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/mp4']
-      if (!validTypes.some(type => selectedFile.type.includes(type.split('/')[1]))) {
-        setError('Please upload an audio file (mp3, wav, ogg, flac, m4a)')
-        return
-      }
       setFile(selectedFile)
       setError(null)
     }
   }
 
   const handleTranscribe = async () => {
-    if (!file) {
-      setError('Please select a file first')
-      return
-    }
-
+    if (!file) return
     setLoading(true)
     setError(null)
-    setResult(null)
-
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('feature_type', featureType)
-
+      formData.append('feature_type', processingMethod)
       const response = await axios.post<TranscriptionResult>('/api/transcribe/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' }
       })
-
-      if (response.data.status === 'success') {
-        setResult(response.data)
-      } else {
-        setError(response.data.error || 'Transcription failed')
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to transcribe audio')
+      if (response.data.status === 'success') setResult(response.data)
+    } catch (err) {
+      setError('Unable to analyze this audio file.')
     } finally {
       setLoading(false)
     }
   }
 
+  // --- Inline Clean Styles ---
+  const wrapperStyle: React.CSSProperties = { width: '100%', maxWidth: '640px', textAlign: 'center' }
+  const titleStyle: React.CSSProperties = { fontFamily: 'var(--font-serif)', fontSize: '2rem', fontWeight: 400, marginBottom: '8px' }
+  const subtitleStyle: React.CSSProperties = { fontSize: '0.85rem', color: 'var(--color-muted)', marginBottom: '40px' }
+  const groupStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginBottom: '32px' }
+  const labelStyle: React.CSSProperties = { fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--color-muted)' }
+  
+  const selectStyle: React.CSSProperties = {
+    background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-ink)',
+    padding: '6px 16px', fontSize: '0.9rem', outline: 'none', cursor: 'pointer', textAlignLast: 'center'
+  }
+
+  const fileInputWrapper: React.CSSProperties = {
+    borderBottom: '1px solid var(--color-muted)', display: 'inline-block', padding: '8px 0',
+    margin: '24px 0', color: 'var(--color-muted)', fontSize: '0.9rem', cursor: 'pointer', position: 'relative'
+  }
+
+  const actionButtonStyle: React.CSSProperties = {
+    background: 'var(--color-ink)', color: '#ffffff', border: 'none', padding: '14px 44px',
+    fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.2em',
+    cursor: 'pointer', marginTop: '24px', transition: 'opacity 0.2s'
+  }
+
   return (
-    <div className="upload-tab">
-      <div className="upload-container">
-        <div className="upload-card">
-          <h2>Upload Audio File</h2>
-          
-          <div className="upload-form">
-            <div className="form-group">
-              <label htmlFor="feature-type">Feature Type:</label>
-              <select
-                id="feature-type"
-                value={featureType}
-                onChange={(e) => setFeatureType(e.target.value)}
-                disabled={loading}
-              >
-                <option value="cqt">CQT (Constant-Q Transform)</option>
-                <option value="mel">Mel-Spectrogram</option>
-              </select>
-            </div>
-
-            <div className="file-input-wrapper">
-              <input
-                type="file"
-                id="file-input"
-                accept="audio/*"
-                onChange={handleFileChange}
-                disabled={loading}
-              />
-              <label htmlFor="file-input" className="file-label">
-                {file ? `📁 ${file.name}` : '📁 Click to select audio file'}
-              </label>
-            </div>
-
-            {file && (
-              <div className="file-info">
-                <p>File: <strong>{file.name}</strong></p>
-                <p>Size: <strong>{(file.size / 1024 / 1024).toFixed(2)} MB</strong></p>
-              </div>
-            )}
-
-            {error && <div className="error-message">{error}</div>}
-
-            <button
-              className="transcribe-button"
-              onClick={handleTranscribe}
-              disabled={!file || loading}
-            >
-              {loading ? 'Transcribing...' : '🎵 Transcribe'}
-            </button>
-          </div>
+    <div style={wrapperStyle}>
+      <h2 style={titleStyle}>Convert Audio to Tablature</h2>
+      <p style={subtitleStyle}>Select an audio file from your device to automatically generate guitar tabs</p>
+      
+      <div>
+        <div style={groupStyle}>
+          <label style={labelStyle}>Processing Method</label>
+          <select 
+            style={selectStyle} 
+            value={processingMethod} 
+            onChange={(e) => setProcessingMethod(e.target.value)}
+          >
+            <option value="cqt">Constant-Q Transform</option>
+            <option value="mel">Mel Spectrogram</option>
+          </select>
         </div>
 
-        {loading && <LoadingSpinner />}
+        <div style={{ margin: '32px 0' }}>
+          <label style={fileInputWrapper}>
+            <input type="file" accept="audio/*" onChange={handleFileChange} style={{ display: 'none' }} />
+            {file ? file.name : 'Choose an audio file'}
+          </label>
+        </div>
 
-        {result && (
-          <div className="results-container">
-            <div className="metadata">
-              <h3>Audio Information</h3>
-              <div className="metadata-grid">
-                <div className="metadata-item">
-                  <span className="label">Duration:</span>
-                  <span className="value">{result.metadata.duration.toFixed(2)}s</span>
-                </div>
-                <div className="metadata-item">
-                  <span className="label">Tempo:</span>
-                  <span className="value">{result.metadata.tempo.toFixed(0)} BPM</span>
-                </div>
-                <div className="metadata-item">
-                  <span className="label">Frames:</span>
-                  <span className="value">{result.metadata.n_frames}</span>
-                </div>
-                <div className="metadata-item">
-                  <span className="label">Feature Type:</span>
-                  <span className="value">{result.metadata.feature_type.toUpperCase()}</span>
-                </div>
-              </div>
-            </div>
+        {error && <p style={{ color: '#c94b4b', fontSize: '0.8rem', margin: '16px 0' }}>{error}</p>}
 
-            <CombinedViewer
-              tabData={result.tab}
-              confidenceData={result.confidence}
-              pianorollData={result.pianoroll}
-              metadata={{
-                duration: result.metadata.duration,
-                tempo: result.metadata.tempo,
-                frames: result.metadata.n_frames,
-              }}
-            />
-          </div>
-        )}
+        <button 
+          style={{ ...actionButtonStyle, opacity: (!file || loading) ? 0.4 : 1 }}
+          onClick={handleTranscribe}
+          disabled={!file || loading}
+        >
+          {loading ? 'Analyzing...' : 'Analyze Audio'}
+        </button>
       </div>
+
+      {loading && <div style={{ marginTop: '40px' }}><LoadingSpinner /></div>}
+
+      {result && (
+        <div style={{ marginTop: '60px', borderTop: '1px solid var(--color-border)', paddingTop: '40px' }}>
+          <CombinedViewer tabData={result.tab} confidenceData={result.confidence} />
+        </div>
+      )}
     </div>
   )
 }

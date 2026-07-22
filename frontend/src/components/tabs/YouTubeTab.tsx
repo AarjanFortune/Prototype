@@ -1,157 +1,71 @@
-import axios from 'axios'
 import { useState } from 'react'
-import './YouTubeTab.css'
-import { CombinedViewer } from '../CombinedViewer'
-import LoadingSpinner from '../LoadingSpinner'
-
-interface PianorollNote {
-  midi: number
-  string: number
-  fret: number
-  start_time: number
-  duration: number
-}
-
-interface TranscriptionResult {
-  status: string
-  tab: string[]
-  confidence: number[][]
-  pianoroll?: {
-    notes: PianorollNote[]
-    total_duration: number
-  }
-  metadata: {
-    duration: number
-    sample_rate: number
-    n_frames: number
-    tempo: number
-    feature_type: string
-  }
-  error?: string
-}
 
 export default function YouTubeTab() {
   const [url, setUrl] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<TranscriptionResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [featureType, setFeatureType] = useState('cqt')
+  const [processingMethod, setProcessingMethod] = useState('cqt')
 
-  const handleTranscribe = async () => {
-    if (!url.trim()) {
-      setError('Please enter a YouTube URL')
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-    setResult(null)
-
-    try {
-      const response = await axios.post<TranscriptionResult>('/api/transcribe/youtube', {
-        url: url.trim(),
-        feature_type: featureType,
-      })
-
-      if (response.data.status === 'success') {
-        setResult(response.data)
-      } else {
-        setError(response.data.error || 'Transcription failed')
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to transcribe YouTube video')
-    } finally {
-      setLoading(false)
-    }
+  const containerLayout: React.CSSProperties = {
+    width: '100%',
+    maxWidth: '560px',
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px'
   }
 
   return (
-    <div className="youtube-tab">
-      <div className="youtube-container">
-        <div className="youtube-card">
-          <h2>Transcribe from YouTube</h2>
-          
-          <div className="youtube-form">
-            <div className="form-group">
-              <label htmlFor="feature-type">Feature Type:</label>
-              <select
-                id="feature-type"
-                value={featureType}
-                onChange={(e) => setFeatureType(e.target.value)}
-                disabled={loading}
-              >
-                <option value="cqt">CQT (Constant-Q Transform)</option>
-                <option value="mel">Mel-Spectrogram</option>
-              </select>
-            </div>
+    <div style={containerLayout}>
+      <div>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', fontWeight: 400, marginBottom: '6px' }}>
+          Transcribe from YouTube
+        </h2>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+          Paste a video link to extract performance tablature
+        </p>
+      </div>
 
-            <div className="url-input-group">
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=..."
-                disabled={loading}
-                className="url-input"
-              />
-            </div>
-
-            {error && <div className="error-message">{error}</div>}
-
-            <button
-              className="transcribe-button"
-              onClick={handleTranscribe}
-              disabled={!url.trim() || loading}
-            >
-              {loading ? 'Downloading & Transcribing...' : '🎬 Transcribe YouTube'}
-            </button>
-
-            <div className="info-box">
-              <p><strong>⏱️ Supported Video Length:</strong> Up to 10 minutes</p>
-              <p><strong>🎵 Audio Quality:</strong> Best available from YouTube</p>
-              <p><strong>💡 Tip:</strong> Paste any YouTube link to transcribe the guitar playing</p>
-            </div>
-          </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--color-muted)' }}>Video URL</label>
+          <input 
+            type="text" 
+            style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-muted)', padding: '6px 0', fontSize: '0.9rem', outline: 'none', textAlign: 'center' }} 
+            placeholder="https://www.youtube.com/watch?v=..." 
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
         </div>
 
-        {loading && <LoadingSpinner message="Downloading and processing video..." />}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--color-muted)' }}>Processing Method</label>
+          <select 
+            style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-ink)', padding: '4px 12px', fontSize: '0.85rem', outline: 'none', cursor: 'pointer', textAlignLast: 'center' }}
+            value={processingMethod} 
+            onChange={(e) => setProcessingMethod(e.target.value)}
+          >
+            <option value="cqt">Constant-Q Transform</option>
+            <option value="mel">Mel-Spectrogram</option>
+          </select>
+        </div>
 
-        {result && (
-          <div className="results-container">
-            <div className="metadata">
-              <h3>Audio Information</h3>
-              <div className="metadata-grid">
-                <div className="metadata-item">
-                  <span className="label">Duration:</span>
-                  <span className="value">{result.metadata.duration.toFixed(2)}s</span>
-                </div>
-                <div className="metadata-item">
-                  <span className="label">Tempo:</span>
-                  <span className="value">{result.metadata.tempo.toFixed(0)} BPM</span>
-                </div>
-                <div className="metadata-item">
-                  <span className="label">Frames:</span>
-                  <span className="value">{result.metadata.n_frames}</span>
-                </div>
-                <div className="metadata-item">
-                  <span className="label">Feature Type:</span>
-                  <span className="value">{result.metadata.feature_type.toUpperCase()}</span>
-                </div>
-              </div>
-            </div>
+        <button 
+          className="btn-primary"
+          disabled={!url}
+          style={{ alignSelf: 'center', marginTop: '10px' }}
+        >
+          Transcribe YouTube Audio
+        </button>
+      </div>
 
-            <CombinedViewer
-              tabData={result.tab}
-              confidenceData={result.confidence}
-              pianorollData={result.pianoroll}
-              metadata={{
-                duration: result.metadata.duration,
-                tempo: result.metadata.tempo,
-                frames: result.metadata.n_frames,
-              }}
-            />
-          </div>
-        )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: '16px', marginTop: '12px' }}>
+        <div style={{ textAlign: 'left', width: '48%' }}>
+          <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-muted)', fontWeight: 600 }}>Fidelity</span>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '2px' }}>Uses premium high-resolution playback data.</p>
+        </div>
+        <div style={{ textAlign: 'right', width: '48%' }}>
+          <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-muted)', fontWeight: 600 }}>Limits</span>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '2px' }}>Optimized for video files up to 10 minutes.</p>
+        </div>
       </div>
     </div>
   )

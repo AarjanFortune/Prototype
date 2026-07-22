@@ -1,21 +1,12 @@
-import './App.css'
-
-.app {
+.app-shell {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
 
 .main-content {
-  flex: 1;
-  padding: 40px 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: 1100px;
   width: 100%;
-}
-
-@media (max-width: 768px) {
-  .main-content {
-    padding: 20px 15px;
-  }
+  margin: 0 auto;
+  padding: 60px 24px 100px 24px;
 }

@@ -1,43 +1,54 @@
-import './App.css'
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg-canvas: #f0f4f7;        
+  --bg-panel: #ffffff;         
+  --color-ink: #111418;        
+  --color-muted: #8a94a6;      
+  --color-border: #e8ecf0;     
+  --font-sans: 'Inter', sans-serif;
+}
 
 * {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica',
-    'Arial', sans-serif;
+  background-color: var(--bg-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
-#root {
-  min-height: 100vh;
-}
-
-.app {
+.app-viewport {
+  width: 100vw;
+  height: 100vh;
   display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
 }
 
-.main-content {
-  flex: 1;
-  padding: 40px 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
+/* Base Stagger Fade-In Utility */
+.stagger-fade {
+  opacity: 0;
+  transform: translateY(15px);
+  transition: opacity 0.8s cubic-bezier(0.25, 1, 0.3, 1), transform 0.8s cubic-bezier(0.25, 1, 0.3, 1);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .main-content {
-    padding: 20px 15px;
-  }
+.stagger-fade.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
+
+/* Transition Delays to create a natural waterfall entrance effect */
+.delay-1 { transition-delay: 0.15s; }
+.delay-2 { transition-delay: 0.25s; }
+.delay-3 { transition-delay: 0.35s; }
+.delay-4 { transition-delay: 0.45s; }
+.delay-5 { transition-delay: 0.55s; }
