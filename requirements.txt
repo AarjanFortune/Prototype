@@ -1,0 +1,14 @@
+torch
+torch_optimizer
+pytorch-ignite
+tensorboardX
+numpy
+PyYAML
+jams
+pandas
+tqdm
+matplotlib
+seaborn
+librosa
+scikit-learn
+pretty_midi
