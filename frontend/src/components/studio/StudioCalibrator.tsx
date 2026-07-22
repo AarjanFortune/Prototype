@@ -59,7 +59,6 @@ export default function StudioCalibrator({
   const [selectedElem, setSelectedElem] = useState<ElementKey>('logo')
   const [copied, setCopied] = useState(false)
   
-  // Draggable window state
   const [position, setPosition] = useState({ x: 30, y: 30 })
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
@@ -142,7 +141,6 @@ export default function StudioCalibrator({
       border: '1px solid rgba(255, 255, 255, 0.8)',
       boxShadow: '0 20px 50px rgba(0, 0, 0, 0.12)'
     }}>
-      {/* Draggable Header */}
       <div 
         onMouseDown={handleMouseDown}
         style={{
@@ -172,7 +170,6 @@ export default function StudioCalibrator({
         {copied ? 'Copied Config Code Parameters!' : 'Copy Config Code Parameters'}
       </button>
 
-      {/* Phase State Selector */}
       <div style={{ marginBottom: '16px', display: 'flex', gap: '6px' }}>
         <button 
           onClick={() => setPhase(0)} 
@@ -194,7 +191,6 @@ export default function StudioCalibrator({
         </button>
       </div>
 
-      {/* Element Target Selector */}
       <div style={{ marginBottom: '14px' }}>
         <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', color: '#6e6e73' }}>
           Select Component [{currentPhaseKey.toUpperCase()}]:
@@ -210,7 +206,6 @@ export default function StudioCalibrator({
         </select>
       </div>
 
-      {/* Realtime Positional Controls */}
       <div style={{ marginBottom: '14px', background: 'rgba(0, 0, 0, 0.03)', padding: '12px', borderRadius: '10px' }}>
         <div style={{ fontWeight: 600, marginBottom: '8px' }}>Real-Time Position & Scale</div>
         
@@ -234,7 +229,6 @@ export default function StudioCalibrator({
         </div>
       </div>
 
-      {/* Curve Preset Grid */}
       <div style={{ marginBottom: '14px', background: 'rgba(0, 0, 0, 0.03)', padding: '12px', borderRadius: '10px' }}>
         <div style={{ fontWeight: 600, marginBottom: '8px' }}>Motion Preset (12)</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
@@ -255,7 +249,6 @@ export default function StudioCalibrator({
         </div>
       </div>
 
-      {/* Entrance Type Selector */}
       <div style={{ background: 'rgba(0, 0, 0, 0.03)', padding: '12px', borderRadius: '10px' }}>
         <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px' }}>Entrance Effect:</label>
         <select

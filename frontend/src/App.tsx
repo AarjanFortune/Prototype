@@ -1,46 +1,94 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Preloader from './components/studio/Preloader'
-import StudioCalibrator, { AllElementsConfig, PRESET_CURVES, SingleElementAnim } from './components/studio/StudioCalibrator'
+import StudioCalibrator, { AllElementsConfig, SingleElementAnim } from './components/studio/StudioCalibrator'
 import StudioWorkspace from './components/studio/StudioWorkspace'
+import ColumnCurtain from './components/studio/ColumnCurtain'
 
 type TabType = 'upload' | 'youtube' | 'live'
 
+const TR_SEQ = [115, 116, 117, 100, 105, 111, 109, 111, 100, 101]
+
 const DEFAULT_CONFIG: AllElementsConfig = {
-  phase1: {
-    logo: { duration: 0.95, bezier: PRESET_CURVES['Figma Gentle'].bezier, presetName: 'Figma Gentle', entryType: 'slide-down', delay: 0, x: 81, y: 32, scale: 1.0, rotate: 0 },
-    guitar: { duration: 1.1, bezier: PRESET_CURVES['Slow-In Spring'].bezier, presetName: 'Slow-In Spring', entryType: 'scale-up', delay: 0.05, x: 51, y: 51, scale: 1.35, rotate: 0 },
-    leftBand: { duration: 0.85, bezier: PRESET_CURVES['Snappy Ease-Out'].bezier, presetName: 'Snappy Ease-Out', entryType: 'slide-right', delay: 0, x: 0, y: 38, scale: 1.0, rotate: 0 },
-    rightBand: { duration: 0.85, bezier: PRESET_CURVES['Snappy Ease-Out'].bezier, presetName: 'Snappy Ease-Out', entryType: 'slide-left', delay: 0, x: 0, y: 38, scale: 1.0, rotate: 0 },
-    navTabs: { duration: 0.75, bezier: PRESET_CURVES['Soft Overshoot'].bezier, presetName: 'Soft Overshoot', entryType: 'slide-up', delay: 0, x: 0, y: 0, scale: 1, rotate: 0 },
-    formCard: { duration: 0.9, bezier: PRESET_CURVES['Figma Gentle'].bezier, presetName: 'Figma Gentle', entryType: 'blur-in', delay: 0, x: 0, y: 0, scale: 1, rotate: 0 },
-    closeBtn: { duration: 0.6, bezier: PRESET_CURVES['Linear Motion'].bezier, presetName: 'Linear Motion', entryType: 'fade', delay: 0, x: 0, y: 0, scale: 1, rotate: 0 }
+  "phase1": {
+    "logo": { "duration": 0.95, "bezier": [0.25, 1, 0.3, 1], "presetName": "Figma Gentle", "entryType": "slide-down", "delay": 0, "x": 57, "y": 15, "scale": 1.65, "rotate": 0 },
+    "guitar": { "duration": 0.95, "bezier": [0.25, 1, 0.3, 1], "presetName": "Figma Gentle", "entryType": "scale-up", "delay": 0.1, "x": 51, "y": 51, "scale": 0.55, "rotate": 0 },
+    "leftBand": { "duration": 0.85, "bezier": [0.4, 0, 0.2, 1], "presetName": "Snappy Ease-Out", "entryType": "slide-right", "delay": 0, "x": 0, "y": 38, "scale": 1, "rotate": 0 },
+    "rightBand": { "duration": 0.85, "bezier": [0.4, 0, 0.2, 1], "presetName": "Snappy Ease-Out", "entryType": "slide-left", "delay": 0, "x": 0, "y": 38, "scale": 1, "rotate": 0 },
+    "navTabs": { "duration": 0.75, "bezier": [0.34, 1.56, 0.64, 1], "presetName": "Soft Overshoot", "entryType": "slide-up", "delay": 0, "x": 0, "y": 0, "scale": 1, "rotate": 0 },
+    "formCard": { "duration": 0.9, "bezier": [0.25, 1, 0.3, 1], "presetName": "Figma Gentle", "entryType": "blur-in", "delay": 0, "x": 0, "y": 0, "scale": 1, "rotate": 0 },
+    "closeBtn": { "duration": 0.6, "bezier": [0, 0, 1, 1], "presetName": "Linear Motion", "entryType": "fade", "delay": 0, "x": 0, "y": 0, "scale": 1, "rotate": 0 }
   },
-  phase2: {
-    logo: { duration: 0.95, bezier: PRESET_CURVES['Figma Gentle'].bezier, presetName: 'Figma Gentle', entryType: 'slide-down', delay: 0, x: 8, y: 8, scale: 0.85, rotate: 0 },
-    guitar: { duration: 1.1, bezier: PRESET_CURVES['Slow-In Spring'].bezier, presetName: 'Slow-In Spring', entryType: 'scale-up', delay: 0.05, x: 85, y: 52, scale: 0.95, rotate: -91 },
-    leftBand: { duration: 0.85, bezier: PRESET_CURVES['Snappy Ease-Out'].bezier, presetName: 'Snappy Ease-Out', entryType: 'slide-right', delay: 0, x: -35, y: 38, scale: 1.0, rotate: 0 },
-    rightBand: { duration: 0.85, bezier: PRESET_CURVES['Snappy Ease-Out'].bezier, presetName: 'Snappy Ease-Out', entryType: 'slide-left', delay: 0, x: -35, y: 38, scale: 1.0, rotate: 0 },
-    navTabs: { duration: 0.75, bezier: PRESET_CURVES['Soft Overshoot'].bezier, presetName: 'Soft Overshoot', entryType: 'slide-up', delay: 0.15, x: 0, y: 0, scale: 1, rotate: 0 },
-    formCard: { duration: 0.9, bezier: PRESET_CURVES['Figma Gentle'].bezier, presetName: 'Figma Gentle', entryType: 'blur-in', delay: 0.25, x: 0, y: 0, scale: 1, rotate: 0 },
-    closeBtn: { duration: 0.6, bezier: PRESET_CURVES['Linear Motion'].bezier, presetName: 'Linear Motion', entryType: 'fade', delay: 0.3, x: 0, y: 0, scale: 1, rotate: 0 }
+  "phase2": {
+    "logo": { "duration": 0.95, "bezier": [0.25, 1, 0.3, 1], "presetName": "Figma Gentle", "entryType": "slide-down", "delay": 0, "x": 8, "y": 8, "scale": 0.85, "rotate": 0 },
+    "guitar": { "duration": 1.1, "bezier": [0.175, 0.885, 0.32, 1.275], "presetName": "Slow-In Spring", "entryType": "scale-up", "delay": 0.05, "x": 85, "y": 52, "scale": 0.35, "rotate": -91 },
+    "leftBand": { "duration": 0.85, "bezier": [0.4, 0, 0.2, 1], "presetName": "Snappy Ease-Out", "entryType": "slide-right", "delay": 0, "x": -35, "y": 38, "scale": 1, "rotate": 0 },
+    "rightBand": { "duration": 0.85, "bezier": [0.4, 0, 0.2, 1], "presetName": "Snappy Ease-Out", "entryType": "slide-left", "delay": 0, "x": -35, "y": 38, "scale": 1, "rotate": 0 },
+    "navTabs": { "duration": 0.75, "bezier": [0.34, 1.56, 0.64, 1], "presetName": "Soft Overshoot", "entryType": "slide-up", "delay": 0.15, "x": 0, "y": 0, "scale": 1, "rotate": 0 },
+    "formCard": { "duration": 0.9, "bezier": [0.25, 1, 0.3, 1], "presetName": "Figma Gentle", "entryType": "blur-in", "delay": 0.25, "x": 0, "y": 0, "scale": 1, "rotate": 0 },
+    "closeBtn": { "duration": 0.6, "bezier": [0, 0, 1, 1], "presetName": "Linear Motion", "entryType": "fade", "delay": 0.3, "x": 0, "y": 0, "scale": 1, "rotate": 0 }
   }
 }
 
 export default function App() {
-  const [phase, setPhase] = useState<number>(0) // 0: Preloader, 1: Hero Setup, 2: Studio
+  const [phase, setPhase] = useState<number>(0) 
+  const [curtainActive, setCurtainActive] = useState(false)
+  const [showCurtain, setShowCurtain] = useState(false)
+  
   const [activeTab, setActiveTab] = useState<TabType>('upload')
-  const [editorEnabled, setEditorEnabled] = useState(false)
+  const [sysDiagnostics, setSysDiagnostics] = useState(false)
   const [animConfig, setAnimConfig] = useState<AllElementsConfig>(DEFAULT_CONFIG)
 
+  const keyBuffer = useRef<number[]>([])
+  const soundRef = useRef<HTMLAudioElement | null>(null)
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'd') {
-        setEditorEnabled(prev => !prev)
+    soundRef.current = new Audio('/images/GEF.mp3')
+    soundRef.current.preload = 'auto'
+  }, [])
+
+  // Secret Obfuscated Keyboard Sequence Detection
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase()
+      const isInputFocused = activeTag === 'input' || activeTag === 'textarea' || (document.activeElement as HTMLElement)?.isContentEditable
+
+      if (isInputFocused) return
+
+      const charCode = e.key.toLowerCase().charCodeAt(0)
+      keyBuffer.current.push(charCode)
+
+      if (keyBuffer.current.length > TR_SEQ.length) {
+        keyBuffer.current.shift()
+      }
+
+      if (
+        keyBuffer.current.length === TR_SEQ.length &&
+        keyBuffer.current.every((code, idx) => code === TR_SEQ[idx])
+      ) {
+        setSysDiagnostics(prev => !prev)
+        keyBuffer.current = []
       }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
   }, [])
+
+  const playSoundAndTransitionToPhase2 = () => {
+    if (soundRef.current) {
+      soundRef.current.currentTime = 0
+      soundRef.current.play().catch(() => {})
+    }
+    setPhase(2)
+  }
+
+  const triggerPhase1Transition = () => {
+    setShowCurtain(true)
+    setPhase(1)
+    requestAnimationFrame(() => {
+      setCurtainActive(true)
+    })
+  }
 
   const currentPhaseKey = phase === 2 ? 'phase2' : 'phase1'
   const activePhaseConfig = animConfig[currentPhaseKey]
@@ -103,41 +151,46 @@ export default function App() {
     border: '1px solid var(--color-border)',
     overflow: 'hidden',
     padding: '48px 64px',
-    cursor: phase === 1 && !editorEnabled ? 'pointer' : 'default'
+    cursor: phase === 1 && !sysDiagnostics ? 'pointer' : 'default'
   }
 
   return (
     <div className="app-viewport" style={{ position: 'relative' }}>
       <div 
         style={containerStyle} 
-        onClick={() => phase === 1 && !editorEnabled && setPhase(2)}
+        onClick={() => phase === 1 && !sysDiagnostics && playSoundAndTransitionToPhase2()}
       >
-        {/* PHASE 0: Preloader Drawing Sequence */}
         {phase === 0 && (
-          <Preloader onComplete={() => setPhase(1)} />
+          <Preloader onComplete={triggerPhase1Transition} />
         )}
 
-        {/* PHASE 1 & 2: Main Layout */}
+        {showCurtain && (
+          <ColumnCurtain 
+            isActive={curtainActive} 
+            onAnimationEnd={() => {
+              setShowCurtain(false)
+              setCurtainActive(false)
+            }} 
+          />
+        )}
+
         {phase > 0 && (
           <>
             <div style={getElementStyle(activePhaseConfig.leftBand, true, false)} />
             <div style={getElementStyle(activePhaseConfig.rightBand, false, true)} />
 
-            {/* Logo */}
             <img 
               src="/images/logo.svg" 
               alt="Guitarica Logo" 
               style={{ ...getElementStyle(activePhaseConfig.logo), width: '160px', zIndex: 3 }} 
             />
 
-            {/* Guitar Showcase */}
             <img 
               src="/images/Guitarica.png" 
               alt="Guitar" 
               style={{ ...getElementStyle(activePhaseConfig.guitar), zIndex: 2, objectFit: 'contain' }} 
             />
 
-            {/* Phase 1 Clean Overlay */}
             {phase === 1 && (
               <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%', width: '100%', pointerEvents: 'none' }}>
                 <div style={{ textAlign: 'center', opacity: 0.6, letterSpacing: '0.25em', textTransform: 'uppercase', fontSize: '0.65rem', color: 'var(--color-ink)', fontWeight: 600 }}>
@@ -146,7 +199,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Phase 2 Studio Workspace */}
             {phase === 2 && (
               <StudioWorkspace 
                 activeTab={activeTab}
@@ -161,28 +213,14 @@ export default function App() {
         )}
       </div>
 
-      {/* Control Calibrator Toggle */}
-      <button 
-        style={{
-          position: 'fixed', bottom: '20px', left: '20px',
-          zIndex: 10000, background: 'rgba(29, 29, 31, 0.85)',
-          backdropFilter: 'blur(10px)', color: '#fff',
-          border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50px', padding: '10px 22px', 
-          cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
-        }}
-        onClick={() => setEditorEnabled(!editorEnabled)}
-      >
-        {editorEnabled ? 'Close Calibrator' : 'Open Controls [D]'}
-      </button>
-
-      {/* Glassmorphic Calibrator */}
-      {editorEnabled && (
+      {/* Secret Obfuscated Calibrator Injection */}
+      {sysDiagnostics && (
         <StudioCalibrator 
           config={animConfig}
           setConfig={setAnimConfig}
           phase={phase}
           setPhase={setPhase}
-          onClose={() => setEditorEnabled(false)}
+          onClose={() => setSysDiagnostics(false)}
         />
       )}
     </div>
