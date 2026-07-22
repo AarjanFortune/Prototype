@@ -1,89 +1,96 @@
 import React, { useState } from 'react'
+import FretboardVisualizer from './FretboardVisualizer'
 
 interface TablatureViewerProps {
-  content: string
+  rawTab: string
   tuning?: string
   tempo?: number
 }
 
 export default function TablatureViewer({
-  content,
+  rawTab,
   tuning = 'Standard (E A D G B E)',
   tempo = 120
 }: TablatureViewerProps) {
   const [copied, setCopied] = useState(false)
 
+  // Example active notes mapped directly for visual demo
+  const sampleNotes = [
+    { stringIdx: 0, fret: 12, label: '12' },
+    { stringIdx: 1, fret: 10, label: '10' },
+    { stringIdx: 2, fret: 9, label: '9' },
+    { stringIdx: 2, fret: 7, label: '7' }
+  ]
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(content)
+    navigator.clipboard.writeText(rawTab)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   return (
-    <div
-      style={{
-        marginTop: '24px',
-        width: '100%',
-        borderRadius: '12px',
-        border: '1px solid var(--color-border, #e5e5ea)',
-        backgroundColor: '#1c1c1e',
-        color: '#f2f2f7',
-        fontFamily: 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace',
-        overflow: 'hidden',
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
-      }}
-    >
-      {/* Studio Bar Header */}
-      <div
-        style={{
-          display: 'flex',
-          justify: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px',
-          borderBottom: '1px solid #2c2c2e',
-          backgroundColor: '#2c2c2e'
-        }}
-      >
+    <div style={{
+      width: '100%',
+      marginTop: '24px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '16px'
+    }}>
+      {/* Editorial Header */}
+      <div style={{
+        display: 'flex',
+        justify: 'space-between',
+        alignItems: 'center',
+        borderBottom: '1px solid var(--color-border)',
+        paddingBottom: '10px'
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#8e8e93' }}>
-            {tuning}
+          <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--color-muted)', fontWeight: 600 }}>
+            Generated Score
           </span>
-          <span style={{ fontSize: '0.7rem', color: '#636366' }}>•</span>
-          <span style={{ fontSize: '0.7rem', color: '#8e8e93' }}>{tempo} BPM</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-ink)', fontWeight: 500 }}>
+            {tuning} • {tempo} BPM
+          </span>
         </div>
 
         <button
           onClick={handleCopy}
           style={{
-            background: copied ? '#34c759' : '#0a84ff',
-            color: '#ffffff',
+            background: 'transparent',
             border: 'none',
-            borderRadius: '6px',
-            padding: '5px 12px',
+            borderBottom: '1px solid var(--color-ink)',
+            color: 'var(--color-ink)',
             fontSize: '0.7rem',
-            fontWeight: 600,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
             cursor: 'pointer',
-            transition: 'background-color 0.2s ease'
+            paddingBottom: '2px',
+            fontWeight: 600
           }}
         >
-          {copied ? 'Copied' : 'Copy ASCII'}
+          {copied ? 'Copied' : 'Copy Text Tab'}
         </button>
       </div>
 
-      {/* Monospaced Staff Display */}
-      <div
-        style={{
-          padding: '20px 16px',
-          overflowX: 'auto',
-          fontSize: '0.82rem',
-          lineHeight: '1.5',
-          letterSpacing: '0.05em',
-          color: '#e5e5ea',
-          whiteSpace: 'pre'
-        }}
-      >
-        {content || `e|--------------------------------------------------|\nB|--------------------------------------------------|\nG|--------------------------------------------------|\nD|--------------------------------------------------|\nA|--------------------------------------------------|\nE|--------------------------------------------------|`}
+      {/* Vector Notation Staff (Light Editorial Aesthetic) */}
+      <div style={{
+        width: '100%',
+        padding: '20px',
+        background: '#f9f9fb',
+        border: '1px solid var(--color-border)',
+        borderRadius: '8px',
+        overflowX: 'auto',
+        fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+        fontSize: '0.85rem',
+        lineHeight: '1.6',
+        color: 'var(--color-ink)',
+        whiteSpace: 'pre'
+      }}>
+        {rawTab || `e|--12--10--------------------|--12--10--------------------|\nB|----------12--10------------|----------12--10------------|\nG|------------------12--9--7~-|------------------12--9--7~-|\nD|----------------------------|----------------------------|\nA|----------------------------|----------------------------|\nE|----------------------------|----------------------------|`}
       </div>
+
+      {/* Embedded Fretboard Mapping */}
+      <FretboardVisualizer activeNotes={sampleNotes} />
     </div>
   )
 }

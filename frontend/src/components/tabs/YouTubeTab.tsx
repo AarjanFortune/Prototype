@@ -1,8 +1,11 @@
 import { useState } from 'react'
+import TablatureViewer from '../studio/TablatureViewer'
 
 export default function YouTubeTab() {
   const [url, setUrl] = useState('')
   const [processingMethod, setProcessingMethod] = useState('cqt')
+  const [status, setStatus] = useState<'idle' | 'processing' | 'complete'>('idle')
+  const [tabData, setTabData] = useState<string>('')
 
   const containerLayout: React.CSSProperties = {
     width: '100%',
@@ -11,6 +14,18 @@ export default function YouTubeTab() {
     display: 'flex',
     flexDirection: 'column',
     gap: '24px'
+  }
+
+  const handleTranscribe = () => {
+    if (!url) return
+    setStatus('processing')
+
+    setTimeout(() => {
+      setTabData(
+        `e|--7h8p7----7h8p7----7h8p7-------------------|\nB|--------10-------10-------10--8~------------|\nG|--------------------------------------------|\nD|--------------------------------------------|\nA|--------------------------------------------|\nE|--------------------------------------------|`
+      )
+      setStatus('complete')
+    }, 2500)
   }
 
   return (
@@ -50,12 +65,15 @@ export default function YouTubeTab() {
 
         <button 
           className="btn-primary"
-          disabled={!url}
+          disabled={!url || status === 'processing'}
+          onClick={handleTranscribe}
           style={{ alignSelf: 'center', marginTop: '10px' }}
         >
-          Transcribe YouTube Audio
+          {status === 'processing' ? 'Processing Stream...' : 'Transcribe YouTube Audio'}
         </button>
       </div>
+
+      {status === 'complete' && <TablatureViewer rawTab={tabData} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: '16px', marginTop: '12px' }}>
         <div style={{ textAlign: 'left', width: '48%' }}>
