@@ -72,6 +72,9 @@ logs/
 # Docker
 .dockerignore
 
+# Local documentation (not currently published)
+docs/
+
 # OS
 .DS_Store
 .DS_Store?
