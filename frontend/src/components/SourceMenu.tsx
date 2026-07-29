@@ -1,7 +1,10 @@
 import { SourceType } from '../types/transcription'
+import { VisualConfig, visualStyle } from '../visualConfig'
 
 interface SourceMenuProps {
   onSelect: (source: SourceType) => void
+  onGuitarClick: () => void
+  visualConfig: VisualConfig
 }
 
 const SOURCES: Array<{ id: SourceType; label: string; detail: string }> = [
@@ -10,10 +13,10 @@ const SOURCES: Array<{ id: SourceType; label: string; detail: string }> = [
   { id: 'live', label: 'Live input', detail: 'Listen' },
 ]
 
-export default function SourceMenu({ onSelect }: SourceMenuProps) {
+export default function SourceMenu({ onSelect, onGuitarClick, visualConfig }: SourceMenuProps) {
   return (
     <section className="source-menu" aria-labelledby="source-menu-title">
-      <div className="menu-copy">
+      <div className="menu-copy" style={visualStyle(visualConfig.menuContent)}>
         <p>Transcription studio</p>
         <h1 id="source-menu-title">Choose source</h1>
 
@@ -28,9 +31,15 @@ export default function SourceMenu({ onSelect }: SourceMenuProps) {
         </nav>
       </div>
 
-      <div className="instrument-stage" aria-hidden="true">
+      <button
+        type="button"
+        className="instrument-stage"
+        style={visualStyle(visualConfig.menuGuitar)}
+        onClick={onGuitarClick}
+        aria-label="Play Guitarica sound"
+      >
         <img src="/images/Guitarica.png" alt="" />
-      </div>
+      </button>
     </section>
   )
 }

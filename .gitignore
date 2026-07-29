@@ -47,6 +47,7 @@ models/checkpoints/
 *.flac
 *.ogg
 *.m4a
+!frontend/public/images/GEF.wav
 uploads/
 temp/
 
