@@ -1,44 +1,116 @@
-"""Audio processing utilities"""
+"""Audio processing utilities using a Standalone Executable to bypass Python SSL issues."""
+import os
+import re
+import urllib.request
+import ssl
+import subprocess
 import numpy as np
 import librosa
 import soundfile as sf
 from pathlib import Path
 from typing import Tuple, Optional
-import yt_dlp
 from config import SAMPLE_RATE, MAX_AUDIO_DURATION, TEMP_DIR
 
 
+def log_terminal(msg: str, is_error: bool = False):
+    """Print directly to terminal standard output (no log files created)."""
+    prefix = "\033[91m[AUDIO_UTILS ERROR]\033[0m" if is_error else "\033[92m[AUDIO_UTILS]\033[0m"
+    print(f"{prefix} {msg}", flush=True)
+
+
+def clean_ansi(text: str) -> str:
+    """Strip ANSI escape codes for clean frontend alert popups."""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
+
+def get_standalone_ytdlp() -> Path:
+    """
+    Downloads the standalone compiled yt-dlp.exe binary.
+    """
+    bin_dir = Path("bin")
+    bin_dir.mkdir(exist_ok=True)
+    exe_path = bin_dir / "yt-dlp.exe"
+
+    if not exe_path.exists():
+        log_terminal("First run detected: Downloading standalone yt-dlp.exe binary...")
+        url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+        try:
+            with urllib.request.urlopen(url) as response, open(exe_path, 'wb') as out_file:
+                out_file.write(response.read())
+            if exe_path.stat().st_size < 1_000_000:
+                exe_path.unlink()
+                raise RuntimeError("Downloaded file too small, corrupt download")
+            log_terminal("Successfully downloaded standalone yt-dlp.exe")
+        except Exception as e:
+            raise RuntimeError(f"Failed to download the yt-dlp executable: {e}")
+
+    return exe_path
+
+
 def load_audio(file_path: str, sr: int = SAMPLE_RATE, mono: bool = True) -> Tuple[np.ndarray, int]:
-    """Load audio file."""
+    """Load audio file safely."""
     audio, sr = librosa.load(file_path, sr=sr, mono=mono)
     return audio, sr
 
 
 def download_youtube_audio(url: str) -> str:
-    """Download audio from YouTube URL."""
+    """
+    Download audio from YouTube using the Standalone Executable.
+    """
+    log_terminal(f"Starting extraction via Standalone Binary for URL: {url}")
+    
+    # Get the standalone executable
+    ytdlp_exe = get_standalone_ytdlp()
+    local_ffmpeg = os.path.expandvars(r"%LOCALAPPDATA%\ffmpeg\bin")
+    
+    # Construct standalone CLI command (no python -m)
+    cmd = [
+        str(ytdlp_exe),
+        "-x",
+        "--audio-format", "mp3",
+        "--audio-quality", "192K",
+        "--no-warnings",
+        "-o", str(TEMP_DIR / "%(id)s.%(ext)s"),
+        url
+    ]
+
+    if os.path.exists(os.path.join(local_ffmpeg, "ffmpeg.exe")):
+        cmd.extend(["--ffmpeg-location", local_ffmpeg])
+        log_terminal(f"FFmpeg path added to CLI: {local_ffmpeg}")
+
     try:
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'outtmpl': str(TEMP_DIR / '%(id)s'),
-            'quiet': False,
-            'no_warnings': False,
-            'socket_timeout': 30,
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            },
-        }
+        log_terminal(f"Executing: {cmd[0]} ...")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=180
+        )
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            audio_file = TEMP_DIR / f"{info['id']}.mp3"
-            return str(audio_file)
+        if result.returncode != 0:
+            log_terminal(f"Binary output warning/error: {result.stderr}", is_error=True)
+
+        # Check for extracted audio files in TEMP_DIR
+        valid_exts = {'.mp3', '.m4a', '.wav', '.ogg', '.opus', '.webm'}
+        matching_files = [
+            f for f in TEMP_DIR.glob("*") 
+            if f.suffix.lower() in valid_exts
+        ]
+        
+        if matching_files:
+            # Pick the most recently created file in TEMP_DIR
+            latest_file = max(matching_files, key=os.path.getmtime)
+            log_terminal(f"Audio extraction successful! File ready at: {latest_file}")
+            return str(latest_file)
+
+        raise FileNotFoundError(f"Binary completed but no audio file was generated. Output: {result.stderr}")
+
     except Exception as e:
-        raise ValueError(f"Failed to download YouTube video: {str(e)}")
+        raw_err = str(e)
+        log_terminal(f"Binary Extraction Failed: {raw_err}", is_error=True)
+        cleaned_error = clean_ansi(raw_err)
+        raise ValueError(f"YouTube Extraction Error: {cleaned_error}")
 
 
 def validate_audio_duration(audio: np.ndarray, sr: int) -> bool:
@@ -49,45 +121,35 @@ def validate_audio_duration(audio: np.ndarray, sr: int) -> bool:
 
 def extract_cqt_features(audio: np.ndarray, sr: int = SAMPLE_RATE, n_bins: int = 192, 
                          hop_length: int = 512) -> np.ndarray:
-    """
-    Extract Constant-Q Transform (CQT) features from audio.
-    
-    Returns:
-        features: (n_frames, n_bins) array
-    """
-    # CQT: 24 bins per octave for guitar resolution (~82 Hz to 5 kHz)
-    # n_bins = 192 with 24 bins/octave = 8 octaves (82 Hz to ~5 kHz)
+    """Extract Constant-Q Transform (CQT) features safely."""
     bins_per_octave = 24
     fmin = 82.41  # Low E string (E2)
-    print("entered here")
     
+    min_samples = hop_length * 4
+    if len(audio) < min_samples:
+        audio = np.pad(audio, (0, min_samples - len(audio)), mode='constant')
+
     cqt = librosa.cqt(audio, sr=sr, hop_length=hop_length, 
                       fmin=fmin, n_bins=n_bins, bins_per_octave=bins_per_octave)
-    print("if error generated")
     cqt_db = librosa.power_to_db(np.abs(cqt) ** 2, ref=np.max)
     
-    # Normalize to [0, 1]
     cqt_normalized = (cqt_db - cqt_db.min()) / (cqt_db.max() - cqt_db.min() + 1e-8)
-    
-    return cqt_normalized.T  # (n_frames, n_bins)
+    return cqt_normalized.T
 
 
 def extract_mel_features(audio: np.ndarray, sr: int = SAMPLE_RATE, 
                         hop_length: int = 512, n_mels: int = 128) -> np.ndarray:
-    """
-    Extract Mel-spectrogram features from audio.
-    
-    Returns:
-        features: (n_frames, n_mels) array
-    """
+    """Extract Mel-spectrogram features safely."""
+    min_samples = hop_length * 4
+    if len(audio) < min_samples:
+        audio = np.pad(audio, (0, min_samples - len(audio)), mode='constant')
+
     mel_spec = librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=n_mels, 
                                               hop_length=hop_length)
     mel_db = librosa.power_to_db(mel_spec, ref=np.max)
     
-    # Normalize to [0, 1]
     mel_normalized = (mel_db - mel_db.min()) / (mel_db.max() - mel_db.min() + 1e-8)
-    
-    return mel_normalized.T  # (n_frames, n_mels)
+    return mel_normalized.T
 
 
 def estimate_tempo(audio: np.ndarray, sr: int = SAMPLE_RATE) -> float:
@@ -95,27 +157,18 @@ def estimate_tempo(audio: np.ndarray, sr: int = SAMPLE_RATE) -> float:
     try:
         onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
         tempo = librosa.tempo(onset_env=onset_env, sr=sr)[0]
-        return float(max(60, min(tempo, 200)))  # Clamp between 60-200 BPM
+        return float(max(60, min(tempo, 200)))
     except:
-        return 120.0  # Default BPM
+        return 120.0
 
 
 def process_audio_file(file_path: str, feature_type: str = "cqt") -> Tuple[np.ndarray, dict]:
-    """
-    Process audio file and extract features.
-    
-    Returns:
-        features: (n_frames, n_bins) array
-        metadata: dict with audio info
-    """
-    # Load audio
+    """Process audio file and extract features."""
     audio, sr = load_audio(file_path)
     
-    # Validate duration
     if not validate_audio_duration(audio, sr):
         raise ValueError(f"Audio duration exceeds {MAX_AUDIO_DURATION} seconds")
     
-    # Extract features
     if feature_type.lower() == "cqt":
         features = extract_cqt_features(audio, sr)
     elif feature_type.lower() == "mel":
@@ -123,7 +176,6 @@ def process_audio_file(file_path: str, feature_type: str = "cqt") -> Tuple[np.nd
     else:
         raise ValueError(f"Unknown feature type: {feature_type}")
     
-    # Estimate tempo
     tempo = estimate_tempo(audio, sr)
     
     metadata = {
@@ -138,11 +190,9 @@ def process_audio_file(file_path: str, feature_type: str = "cqt") -> Tuple[np.nd
 
 
 def save_audio_chunk(audio_chunk: np.ndarray, file_path: str, sr: int = SAMPLE_RATE):
-    """Save audio chunk to file."""
     sf.write(file_path, audio_chunk, sr)
 
 
 def get_chunk_from_audio(audio: np.ndarray, start_frame: int, chunk_frames: int) -> np.ndarray:
-    """Extract a chunk from audio."""
     end_frame = min(start_frame + chunk_frames, len(audio))
     return audio[start_frame:end_frame]
