@@ -1,15 +1,9 @@
-"""Audio processing utilities using a Standalone Executable to bypass Python SSL issues."""
-import os
-import re
-import urllib.request
-import ssl
-import subprocess
+"""Audio processing utilities."""
 import numpy as np
 import librosa
 import soundfile as sf
-from pathlib import Path
-from typing import Tuple, Optional
-from config import SAMPLE_RATE, MAX_AUDIO_DURATION, TEMP_DIR
+from typing import Tuple
+from config import SAMPLE_RATE, MAX_AUDIO_DURATION
 
 
 def log_terminal(msg: str, is_error: bool = False):
@@ -18,99 +12,10 @@ def log_terminal(msg: str, is_error: bool = False):
     print(f"{prefix} {msg}", flush=True)
 
 
-def clean_ansi(text: str) -> str:
-    """Strip ANSI escape codes for clean frontend alert popups."""
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    return ansi_escape.sub('', text)
-
-
-def get_standalone_ytdlp() -> Path:
-    """
-    Downloads the standalone compiled yt-dlp.exe binary.
-    """
-    bin_dir = Path("bin")
-    bin_dir.mkdir(exist_ok=True)
-    exe_path = bin_dir / "yt-dlp.exe"
-
-    if not exe_path.exists():
-        log_terminal("First run detected: Downloading standalone yt-dlp.exe binary...")
-        url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-        try:
-            with urllib.request.urlopen(url) as response, open(exe_path, 'wb') as out_file:
-                out_file.write(response.read())
-            if exe_path.stat().st_size < 1_000_000:
-                exe_path.unlink()
-                raise RuntimeError("Downloaded file too small, corrupt download")
-            log_terminal("Successfully downloaded standalone yt-dlp.exe")
-        except Exception as e:
-            raise RuntimeError(f"Failed to download the yt-dlp executable: {e}")
-
-    return exe_path
-
-
 def load_audio(file_path: str, sr: int = SAMPLE_RATE, mono: bool = True) -> Tuple[np.ndarray, int]:
     """Load audio file safely."""
     audio, sr = librosa.load(file_path, sr=sr, mono=mono)
     return audio, sr
-
-
-def download_youtube_audio(url: str) -> str:
-    """
-    Download audio from YouTube using the Standalone Executable.
-    """
-    log_terminal(f"Starting extraction via Standalone Binary for URL: {url}")
-    
-    # Get the standalone executable
-    ytdlp_exe = get_standalone_ytdlp()
-    local_ffmpeg = os.path.expandvars(r"%LOCALAPPDATA%\ffmpeg\bin")
-    
-    # Construct standalone CLI command (no python -m)
-    cmd = [
-        str(ytdlp_exe),
-        "-x",
-        "--audio-format", "mp3",
-        "--audio-quality", "192K",
-        "--no-warnings",
-        "-o", str(TEMP_DIR / "%(id)s.%(ext)s"),
-        url
-    ]
-
-    if os.path.exists(os.path.join(local_ffmpeg, "ffmpeg.exe")):
-        cmd.extend(["--ffmpeg-location", local_ffmpeg])
-        log_terminal(f"FFmpeg path added to CLI: {local_ffmpeg}")
-
-    try:
-        log_terminal(f"Executing: {cmd[0]} ...")
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180
-        )
-        
-        if result.returncode != 0:
-            log_terminal(f"Binary output warning/error: {result.stderr}", is_error=True)
-
-        # Check for extracted audio files in TEMP_DIR
-        valid_exts = {'.mp3', '.m4a', '.wav', '.ogg', '.opus', '.webm'}
-        matching_files = [
-            f for f in TEMP_DIR.glob("*") 
-            if f.suffix.lower() in valid_exts
-        ]
-        
-        if matching_files:
-            # Pick the most recently created file in TEMP_DIR
-            latest_file = max(matching_files, key=os.path.getmtime)
-            log_terminal(f"Audio extraction successful! File ready at: {latest_file}")
-            return str(latest_file)
-
-        raise FileNotFoundError(f"Binary completed but no audio file was generated. Output: {result.stderr}")
-
-    except Exception as e:
-        raw_err = str(e)
-        log_terminal(f"Binary Extraction Failed: {raw_err}", is_error=True)
-        cleaned_error = clean_ansi(raw_err)
-        raise ValueError(f"YouTube Extraction Error: {cleaned_error}")
 
 
 def validate_audio_duration(audio: np.ndarray, sr: int) -> bool:
@@ -158,7 +63,7 @@ def estimate_tempo(audio: np.ndarray, sr: int = SAMPLE_RATE) -> float:
         onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
         tempo = librosa.tempo(onset_env=onset_env, sr=sr)[0]
         return float(max(60, min(tempo, 200)))
-    except:
+    except Exception:
         return 120.0
 
 

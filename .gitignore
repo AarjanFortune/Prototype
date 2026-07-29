@@ -54,6 +54,9 @@ node_modules/
 .npm
 dist/
 build/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # Environment variables
 .env

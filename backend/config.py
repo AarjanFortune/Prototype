@@ -1,4 +1,3 @@
-"""Configuration for the Guitar Transcription Web App"""
 import os
 from pathlib import Path
 
@@ -51,9 +50,16 @@ CHUNK_DURATION = 1.0  # seconds per chunk for real-time processing
 CHUNK_SIZE = int(SAMPLE_RATE * CHUNK_DURATION)
 
 # API Settings
-API_HOST = "0.0.0.0"
-API_PORT = 8000
-CORS_ORIGINS = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"]
+API_HOST = os.getenv("API_HOST", "0.0.0.0")
+API_PORT = int(os.getenv("API_PORT", "8000"))
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
 
 # Processing
 BATCH_SIZE = 1
