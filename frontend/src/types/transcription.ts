@@ -8,19 +8,39 @@ export interface TranscribedNote {
 }
 
 export interface BackendMetadata {
-  duration?: number
-  sample_rate?: number
-  n_frames?: number
-  tempo?: number
-  feature_type?: string
+  duration: number
+  sample_rate: number
+  n_frames: number
+  tempo: number
+  feature_type: string
+}
+
+export interface BackendSourceMetadata {
+  kind: 'upload' | 'youtube'
+  name: string
+  size_bytes: number
+  url?: string | null
+}
+
+export interface BackendTranscriptionResponse {
+  status: 'success'
+  source: BackendSourceMetadata
+  tab?: unknown[]
+  pitch?: unknown[]
+  confidence?: number[][]
+  pianoroll?: {
+    notes?: unknown[]
+    total_duration?: number
+  }
+  metadata: BackendMetadata
+  audio_url?: string | null
 }
 
 export interface TranscriptionResult {
   notes: TranscribedNote[]
-  metadata: BackendMetadata | null
+  metadata: BackendMetadata
+  source: BackendSourceMetadata
   audioUrl?: string | null
   sourceFile?: File | null
   confidence?: number[][]
-  fileName: string
-  fileSize: string
 }

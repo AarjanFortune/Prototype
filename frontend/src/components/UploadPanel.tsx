@@ -30,12 +30,11 @@ export default function UploadPanel({
       const payload = await transcribeUpload(file, featureType)
       onComplete({
         notes: mapBackendNotes(payload),
-        metadata: payload.metadata || null,
+        metadata: payload.metadata,
+        source: payload.source,
         audioUrl: null,
         sourceFile: file,
         confidence: payload.confidence || [],
-        fileName: file.name,
-        fileSize: formatBytes(file.size),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to transcribe this file.')

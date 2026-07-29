@@ -29,13 +29,15 @@ export default function YouTubePanel({
 
     try {
       const payload = await transcribeYoutube(trimmedUrl, featureType)
+      if (!payload.audio_url) {
+        throw new Error('Backend did not return playable audio for this result.')
+      }
       onComplete({
         notes: mapBackendNotes(payload),
-        metadata: payload.metadata || null,
-        audioUrl: payload.audio_url || null,
+        metadata: payload.metadata,
+        source: payload.source,
+        audioUrl: payload.audio_url,
         confidence: payload.confidence || [],
-        fileName: 'YouTube source',
-        fileSize: 'Extracted audio',
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to process this YouTube link.')
@@ -57,7 +59,6 @@ export default function YouTubePanel({
           <input
             type="url"
             className="text-input"
-            placeholder="https://www.youtube.com/watch?v=..."
             value={url}
             onChange={(event) => {
               setUrl(event.target.value)

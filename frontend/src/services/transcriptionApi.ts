@@ -1,8 +1,8 @@
-import { FeatureType } from '../types/transcription'
+import { BackendTranscriptionResponse, FeatureType } from '../types/transcription'
 
 const API_BASE = ''
 
-async function parseResponse(response: Response) {
+async function parseResponse(response: Response): Promise<BackendTranscriptionResponse> {
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
@@ -14,7 +14,24 @@ async function parseResponse(response: Response) {
     throw new Error(payload.error || 'Transcription failed')
   }
 
-  return payload
+  if (
+    payload?.status !== 'success' ||
+    !payload.source ||
+    typeof payload.source.name !== 'string' ||
+    payload.source.name.trim().length === 0 ||
+    typeof payload.source.size_bytes !== 'number' ||
+    !payload.metadata ||
+    typeof payload.metadata.duration !== 'number' ||
+    typeof payload.metadata.sample_rate !== 'number' ||
+    typeof payload.metadata.n_frames !== 'number' ||
+    typeof payload.metadata.tempo !== 'number' ||
+    typeof payload.metadata.feature_type !== 'string' ||
+    !Array.isArray(payload?.pianoroll?.notes)
+  ) {
+    throw new Error('Backend returned an incomplete transcription result.')
+  }
+
+  return payload as BackendTranscriptionResponse
 }
 
 export async function transcribeUpload(file: File, featureType: FeatureType) {

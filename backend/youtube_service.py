@@ -1,10 +1,13 @@
 """YouTube URL validation and audio extraction."""
+import json
 import os
 import re
 import shutil
 import subprocess
+import time
 import urllib.request
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
@@ -29,6 +32,15 @@ MEDIA_EXTENSIONS = {".mp3", ".m4a", ".wav", ".ogg", ".opus", ".webm"}
 
 class YouTubeUrlError(ValueError):
     """Raised when a submitted YouTube URL is malformed or unsupported."""
+
+
+@dataclass(frozen=True)
+class YouTubeDownload:
+    audio_path: str
+    title: str
+    video_id: str
+    webpage_url: str
+    size_bytes: int
 
 
 def clean_ansi(text: str) -> str:
@@ -135,8 +147,8 @@ def get_standalone_ytdlp() -> Path:
     return exe_path
 
 
-def download_youtube_audio(raw_url: str) -> str:
-    """Validate a YouTube URL and extract its audio into the temp directory."""
+def download_youtube_source(raw_url: str) -> YouTubeDownload:
+    """Validate a YouTube URL and return extracted audio with source metadata."""
     normalized_url = validate_youtube_url(raw_url)
     ytdlp_exe = get_standalone_ytdlp()
     output_dir = TEMP_DIR / f"youtube_{uuid.uuid4().hex}"
@@ -154,6 +166,7 @@ def download_youtube_audio(raw_url: str) -> str:
         "mp3",
         "--audio-quality",
         "192K",
+        "--write-info-json",
         "-o",
         str(output_dir / "%(id)s.%(ext)s"),
         normalized_url,
@@ -169,23 +182,68 @@ def download_youtube_audio(raw_url: str) -> str:
 
     try:
         log_terminal(f"Extracting audio from normalized URL: {normalized_url}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "yt-dlp failed")
+        result = None
+        for attempt in range(3):
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            if result.returncode == 0:
+                break
+            if attempt < 2:
+                log_terminal(f"Extraction attempt {attempt + 1} failed; refreshing the media URL.")
+                _clear_download_attempt(output_dir)
+                time.sleep(1)
+
+        if result is None or result.returncode != 0:
+            error_output = result.stderr if result else ""
+            standard_output = result.stdout if result else ""
+            raise RuntimeError(error_output.strip() or standard_output.strip() or "yt-dlp failed")
 
         media_files = [path for path in output_dir.glob("*") if path.suffix.lower() in MEDIA_EXTENSIONS]
         if not media_files:
             raise FileNotFoundError(result.stderr.strip() or "yt-dlp completed without producing audio.")
 
         audio_file = max(media_files, key=os.path.getmtime)
+        source_metadata = _read_source_metadata(output_dir)
+        video_id = str(source_metadata.get("id") or audio_file.stem)
+        title = str(source_metadata.get("title") or video_id)
+        webpage_url = str(source_metadata.get("webpage_url") or normalized_url)
         log_terminal(f"Audio extraction complete: {audio_file}")
-        return str(audio_file)
+        return YouTubeDownload(
+            audio_path=str(audio_file),
+            title=title,
+            video_id=video_id,
+            webpage_url=webpage_url,
+            size_bytes=audio_file.stat().st_size,
+        )
     except YouTubeUrlError:
         raise
     except Exception as exc:
         message = clean_ansi(str(exc))
         log_terminal(message, is_error=True)
         raise ValueError(f"YouTube extraction failed: {message}") from exc
+
+
+def download_youtube_audio(raw_url: str) -> str:
+    """Compatibility wrapper returning only the extracted audio path."""
+    return download_youtube_source(raw_url).audio_path
+
+
+def _read_source_metadata(output_dir: Path) -> dict:
+    info_files = list(output_dir.glob("*.info.json"))
+    if not info_files:
+        return {}
+
+    info_file = max(info_files, key=os.path.getmtime)
+    try:
+        with info_file.open("r", encoding="utf-8") as file:
+            return json.load(file)
+    finally:
+        info_file.unlink(missing_ok=True)
+
+
+def _clear_download_attempt(output_dir: Path) -> None:
+    for path in output_dir.iterdir():
+        if path.is_file():
+            path.unlink(missing_ok=True)
 
 
 def _resolve_ffmpeg_path() -> str | None:

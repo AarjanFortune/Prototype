@@ -22,9 +22,9 @@ from config import (
     UPLOADS_DIR,
 )
 from inference_pipeline import create_inference_pipeline
-from schemas import TranscriptionResponse, YouTubeTranscriptionRequest
+from schemas import SourceMetadata, TranscriptionResponse, YouTubeTranscriptionRequest
 from transcription_service import audio_static_url, transcribe_audio_file
-from youtube_service import YouTubeUrlError, download_youtube_audio
+from youtube_service import YouTubeUrlError, download_youtube_source
 
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -79,7 +79,15 @@ async def transcribe_upload(
             output.write(await file.read())
 
         result = transcribe_audio_file(str(temp_path), feature_type, inference_pipeline)
-        return TranscriptionResponse(status="success", **result)
+        return TranscriptionResponse(
+            status="success",
+            source=SourceMetadata(
+                kind="upload",
+                name=Path(file.filename or temp_path.name).name,
+                size_bytes=temp_path.stat().st_size,
+            ),
+            **result,
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -92,11 +100,17 @@ async def transcribe_upload(
 @app.post("/api/transcribe/youtube", response_model=TranscriptionResponse)
 async def transcribe_youtube(request: YouTubeTranscriptionRequest) -> TranscriptionResponse:
     try:
-        audio_file = download_youtube_audio(request.url)
-        result = transcribe_audio_file(audio_file, request.feature_type, inference_pipeline)
+        download = download_youtube_source(request.url)
+        result = transcribe_audio_file(download.audio_path, request.feature_type, inference_pipeline)
         return TranscriptionResponse(
             status="success",
-            audio_url=audio_static_url(audio_file),
+            source=SourceMetadata(
+                kind="youtube",
+                name=download.title,
+                size_bytes=download.size_bytes,
+                url=download.webpage_url,
+            ),
+            audio_url=audio_static_url(download.audio_path),
             **result,
         )
     except YouTubeUrlError as exc:

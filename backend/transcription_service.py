@@ -12,7 +12,24 @@ def transcribe_audio_file(
 ) -> dict:
     features, metadata = process_audio_file(file_path, feature_type)
     result = pipeline.transcribe(features, metadata["tempo"])
+    _align_pianoroll_timing(result, metadata["duration"])
     return {**result, "metadata": metadata}
+
+
+def _align_pianoroll_timing(result: dict, audio_duration: float) -> None:
+    pianoroll = result.get("pianoroll")
+    if not isinstance(pianoroll, dict):
+        return
+
+    model_duration = float(pianoroll.get("total_duration") or 0)
+    if model_duration <= 0 or audio_duration <= 0:
+        return
+
+    time_scale = audio_duration / model_duration
+    for note in pianoroll.get("notes", []):
+        note["start_time"] = float(note["start_time"]) * time_scale
+        note["duration"] = float(note["duration"]) * time_scale
+    pianoroll["total_duration"] = audio_duration
 
 
 def audio_static_url(file_path: str) -> str:
