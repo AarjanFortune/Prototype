@@ -1,5 +1,6 @@
 # Backend
 __pycache__/
+backend/bin/
 *.py[cod]
 *$py.class
 *.so

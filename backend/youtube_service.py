@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Iterable
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-import certifi
-
 from config import TEMP_DIR
 
 
@@ -149,8 +147,8 @@ def download_youtube_audio(raw_url: str) -> str:
         "--no-playlist",
         "--no-warnings",
         "--force-ipv4",
-        "--ca-certificate",
-        certifi.where(),
+        "--format",
+        "bestaudio/best",
         "-x",
         "--audio-format",
         "mp3",
@@ -164,6 +162,10 @@ def download_youtube_audio(raw_url: str) -> str:
     ffmpeg_path = _resolve_ffmpeg_path()
     if ffmpeg_path:
         cmd.extend(["--ffmpeg-location", ffmpeg_path])
+
+    js_runtime = _resolve_js_runtime()
+    if js_runtime:
+        cmd.extend(["--js-runtimes", js_runtime])
 
     try:
         log_terminal(f"Extracting audio from normalized URL: {normalized_url}")
@@ -193,3 +195,11 @@ def _resolve_ffmpeg_path() -> str | None:
 
     ffmpeg = shutil.which("ffmpeg")
     return str(Path(ffmpeg).parent) if ffmpeg else None
+
+
+def _resolve_js_runtime() -> str | None:
+    for runtime in ("deno", "node", "bun"):
+        executable = shutil.which(runtime)
+        if executable:
+            return f"{runtime}:{executable}"
+    return None
