@@ -3,6 +3,7 @@ import { transcribeYoutube } from '../services/transcriptionApi'
 import { FeatureType, TranscriptionResult } from '../types/transcription'
 import { mapBackendNotes } from '../utils/formatTranscription'
 import AnalysisControls from './AnalysisControls'
+import ProgressMeter from './ProgressMeter'
 
 interface YouTubePanelProps {
   featureType: FeatureType
@@ -46,12 +47,8 @@ export default function YouTubePanel({
   return (
     <section className="input-section" aria-labelledby="youtube-title">
       <div className="section-heading">
-        <p className="section-kicker">YouTube source</p>
-        <h2 id="youtube-title">Analyze a single YouTube performance.</h2>
-        <p>
-          Supports standard watch URLs, Shorts, live links, embeds, and youtu.be
-          links. Playlist-only links are rejected to keep the report scoped.
-        </p>
+        <span>YouTube</span>
+        <h1 id="youtube-title">Paste a link</h1>
       </div>
 
       <div className="form-stack">
@@ -72,6 +69,7 @@ export default function YouTubePanel({
         <AnalysisControls featureType={featureType} onFeatureTypeChange={onFeatureTypeChange} />
 
         {error && <p className="form-error">{error}</p>}
+        <ProgressMeter active={isProcessing} />
 
         <button
           type="button"
@@ -79,7 +77,7 @@ export default function YouTubePanel({
           disabled={!url.trim() || isProcessing}
           onClick={handleSubmit}
         >
-          {isProcessing ? 'Extracting and transcribing' : 'Run transcription'}
+          {isProcessing ? 'Transcribing' : 'Transcribe'}
         </button>
       </div>
     </section>

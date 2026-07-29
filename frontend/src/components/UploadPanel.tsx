@@ -3,6 +3,7 @@ import { transcribeUpload } from '../services/transcriptionApi'
 import { FeatureType, TranscriptionResult } from '../types/transcription'
 import { formatBytes, mapBackendNotes } from '../utils/formatTranscription'
 import AnalysisControls from './AnalysisControls'
+import ProgressMeter from './ProgressMeter'
 
 interface UploadPanelProps {
   featureType: FeatureType
@@ -46,12 +47,8 @@ export default function UploadPanel({
   return (
     <section className="input-section" aria-labelledby="upload-title">
       <div className="section-heading">
-        <p className="section-kicker">Audio file</p>
-        <h2 id="upload-title">Convert a performance into tablature.</h2>
-        <p>
-          Upload a clean guitar recording. The analysis returns synchronized tab,
-          timing metadata, and a playable report.
-        </p>
+        <span>Audio file</span>
+        <h1 id="upload-title">Select audio</h1>
       </div>
 
       <div className="form-stack">
@@ -67,17 +64,18 @@ export default function UploadPanel({
         />
 
         <div className="file-row">
-          <button type="button" className="text-action" onClick={() => inputRef.current?.click()}>
+          <button type="button" className="secondary-action" onClick={() => inputRef.current?.click()}>
             Choose file
           </button>
           <span className="file-summary">
-            {file ? `${file.name} / ${formatBytes(file.size)}` : 'MP3, WAV, FLAC, OGG, M4A, AAC'}
+            {file ? `${file.name} / ${formatBytes(file.size)}` : 'MP3, WAV, FLAC, OGG, M4A or AAC'}
           </span>
         </div>
 
         <AnalysisControls featureType={featureType} onFeatureTypeChange={onFeatureTypeChange} />
 
         {error && <p className="form-error">{error}</p>}
+        <ProgressMeter active={isProcessing} />
 
         <button
           type="button"
@@ -85,7 +83,7 @@ export default function UploadPanel({
           disabled={!file || isProcessing}
           onClick={handleSubmit}
         >
-          {isProcessing ? 'Transcribing' : 'Run transcription'}
+          {isProcessing ? 'Transcribing' : 'Transcribe'}
         </button>
       </div>
     </section>

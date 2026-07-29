@@ -6,9 +6,9 @@ interface SourceTabsProps {
 }
 
 const SOURCES: Array<{ id: SourceType; label: string }> = [
-  { id: 'upload', label: 'Upload' },
+  { id: 'upload', label: 'File' },
   { id: 'youtube', label: 'YouTube' },
-  { id: 'live', label: 'Live input' },
+  { id: 'live', label: 'Live' },
 ]
 
 export default function SourceTabs({ activeSource, onChange }: SourceTabsProps) {

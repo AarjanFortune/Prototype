@@ -111,12 +111,8 @@ export default function LiveInputPanel() {
   return (
     <section className="input-section live-section" aria-labelledby="live-title">
       <div className="section-heading">
-        <p className="section-kicker">Live input</p>
-        <h2 id="live-title">Monitor fret predictions from microphone input.</h2>
-        <p>
-          The live stream sends short audio windows to the backend and reports the
-          latest frame returned by the model.
-        </p>
+        <span>Live input</span>
+        <h1 id="live-title">Play</h1>
       </div>
 
       <div className="live-controls">
